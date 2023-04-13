@@ -4,6 +4,7 @@ import sys
 import typing
 
 from selenium.common import NoSuchElementException, StaleElementReferenceException
+from selenium.webdriver import Keys
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
@@ -37,6 +38,67 @@ def select_brand_and_model(driver, car_brand, car_model):
     select_from_dropdown_list('//input[@placeholder="Модель авто"]', car_model)
     submit_button_el = driver.find_element(By.XPATH, '//button[@data-marker="search-filters/submit-button"]')
     submit_button_el.click()
+
+
+def select_spare_part(driver, spare_part) -> bool:
+    '''
+    Enters spare part name in search box, presses Enter and waits until the page is loaded
+    Opens page with search results
+    :param driver:
+    :param spare_part: name of spare part to search
+    :return: True if search has found something, False if no (relevant) results found
+    '''
+    logging.info(f'Selecting spare part - {spare_part}')
+    WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH,
+                                                                    '//div[@id="app"]//div[starts-with(@class, "index-search")]//input[@placeholder="Поиск по объявлениям"]')))
+    textbox_el = driver.find_element(By.CLASS_NAME, 'input-input-Zpzc1')
+    textbox_el.send_keys(spare_part)
+    textbox_el.send_keys(Keys.ENTER)
+    WebDriverWait(driver, 10, poll_frequency=0.1).until(EC.title_contains(spare_part))
+
+    def is_search_results_found(dr):
+        try:
+            search_result_el = dr.find_element(By.XPATH, '//div[@id="app"]//div[starts-with(@class, "items-items")]')
+            if len(search_result_el.get_attribute('innerHTML')) > 0:
+                return True
+        except NoSuchElementException:
+            pass
+        return False
+
+    def is_no_result(dr):
+        try:
+            dr.find_element(By.XPATH, '//div[@id="app"]//div[starts-with(@class, "no-results-root")]')
+            return True
+        except NoSuchElementException:
+            pass
+        return False
+
+    def is_page_ready(dr):
+        return is_search_results_found(dr) or is_no_result(dr)
+
+    def has_you_probably_need_this_categories(dr):
+        try:
+            dr.find_element(By.XPATH,
+                            '//div[@id="app"]//div[starts-with(@class, "index-content")]//div[starts-with(@class, "styles-title")]//div[text()[contains(.,"Скорее всего, вам нужна одна из")]]')
+            return True
+        except NoSuchElementException:
+            pass
+        return False
+
+    def nothing_is_found(dr):
+        try:
+            dr.find_element(By.XPATH,
+                            '//div[@id="app"]//div[starts-with(@class, "index-content")]//div[starts-with(@class, "styles-title")]//div[text()[contains(.,"Ничего не нашлось")]]')
+            return True
+        except NoSuchElementException:
+            pass
+        return False
+
+    ignored_exceptions = (NoSuchElementException, StaleElementReferenceException,)
+    WebDriverWait(driver, 5, ignored_exceptions=ignored_exceptions, poll_frequency=0.1).until(is_page_ready)
+    if is_no_result(driver) or has_you_probably_need_this_categories(driver) or nothing_is_found(driver):
+        return False
+    return True
 
 
 def scrape(driver, cfg: ScrapingConfig, query: SearchQuery) -> typing.List[ScrapedItem]:
