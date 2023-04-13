@@ -40,7 +40,7 @@ class Config:
 
 def read_config() -> Optional[Config]:
     config = configparser.ConfigParser()
-    config_path = os.path.join(os.getcwd(), 'avito_scrapper', 'config', 'config.ini')
+    config_path = os.path.join(os.path.split(os.path.realpath(__file__))[0], 'config.ini')
     if not config.read(config_path, encoding='utf-8'):
         logging.critical("[ConfigError] Can't read config.ini")
         return None

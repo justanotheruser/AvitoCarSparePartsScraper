@@ -7,8 +7,10 @@ import time
 import openpyxl
 import pika
 
-from avito_scrapper.common.logger import setup_logger
-from avito_scrapper.config.config import read_config
+sys.path.append(os.path.dirname(__file__) + "/..")
+from common.logger import setup_logger
+from common.config import read_config
+from common.queues import SEARCH_QUERIES_QUEUE
 
 
 def read_search_queries_from_file(filename: str):
@@ -19,9 +21,6 @@ def read_search_queries_from_file(filename: str):
         if i == 0:
             continue
         yield {'car_brand': row[0], 'car_model': row[1], 'spare_part': row[2]}
-
-
-SEARCH_QUERIES_QUEUE = 'search_queries'
 
 
 def main():

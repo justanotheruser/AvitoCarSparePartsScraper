@@ -10,7 +10,7 @@ class SearchQuery:
 
 
 @dataclass
-class SparePartSaleAd:
+class ScrapedItem:
     car_brand: str
     car_model: str
     spare_part: str
