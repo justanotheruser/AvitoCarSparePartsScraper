@@ -1,3 +1,4 @@
+import logging
 import os
 import sys
 
@@ -13,8 +14,8 @@ if __name__ == '__main__':
     try:
         driver.get(cfg.scraping.start_url)
         select_brand_and_model(driver, 'Hyundai', 'Solaris')
-    except Exception:
-        pass
+    except Exception as e:
+        logging.exception(e)
     finally:
         driver.close()
         driver.quit()

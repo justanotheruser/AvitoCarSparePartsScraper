@@ -1,10 +1,9 @@
 import logging
 import os
 import sys
-import time
 import typing
 
-from selenium.common import NoSuchElementException, StaleElementReferenceException, ElementClickInterceptedException
+from selenium.common import NoSuchElementException, StaleElementReferenceException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
@@ -12,17 +11,6 @@ from selenium.webdriver.support.wait import WebDriverWait
 sys.path.append(os.path.dirname(__file__) + "/..")
 from common.types import SearchQuery, ScrapedItem
 from common.config import ScrapingConfig
-
-
-def try_to_click_ignore_interception(el, timeout):
-    start_time = time.time()
-    while time.time() < start_time + timeout:
-        try:
-            el.click()
-            break
-        except ElementClickInterceptedException:
-            time.sleep(1 / 10)
-    el.click()
 
 
 def select_brand_and_model(driver, car_brand, car_model):
@@ -33,16 +21,17 @@ def select_brand_and_model(driver, car_brand, car_model):
         WebDriverWait(driver, timeout, ignored_exceptions=ignored_exceptions).until(
             EC.element_to_be_clickable((By.XPATH, textbox_xpath)))
         textbox_el = driver.find_element(By.XPATH, textbox_xpath)
-        try_to_click_ignore_interception(textbox_el, timeout=2)
-
+        textbox_el.send_keys(choice)
         WebDriverWait(driver, timeout, ignored_exceptions=ignored_exceptions).until(
             EC.presence_of_element_located((By.XPATH,
                                             '//body/div[starts-with(@class, '
                                             '"dropdown-dropdown-box")]/div[starts-with('
                                             '@class, "dropdown-list-")]')))
         choice_xpath = '//div[starts-with(@class, "dropdown-list-")]//span[text()="{0}"]'.format(choice)
+        WebDriverWait(driver, timeout, ignored_exceptions=ignored_exceptions).until(
+            EC.element_to_be_clickable((By.XPATH, choice_xpath)))
         choice_el = driver.find_element(By.XPATH, choice_xpath)
-        try_to_click_ignore_interception(choice_el, timeout=2)
+        choice_el.click()
 
     select_from_dropdown_list('//input[@placeholder="Марка авто"]', car_brand)
     select_from_dropdown_list('//input[@placeholder="Модель авто"]', car_model)

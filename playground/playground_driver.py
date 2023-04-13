@@ -14,7 +14,7 @@ def create_user_profile_dir():
 
 def create_playground_driver():
     options = uc.ChromeOptions()
-    #options.add_argument('--headless=new')
+    options.add_argument('--headless=new')
     options.add_argument("--user-data-dir={0}".format(create_user_profile_dir()))
     options.page_load_strategy = 'eager'
     return uc.Chrome(options=options, driver_executable_path='../scrapper/undetected_chromedriver.exe', use_subprocess=False)
