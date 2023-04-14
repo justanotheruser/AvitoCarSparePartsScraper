@@ -3,6 +3,7 @@ import os
 import sys
 import typing
 
+import undetected_chromedriver as uc
 from selenium.common import NoSuchElementException, StaleElementReferenceException
 from selenium.webdriver import Keys
 from selenium.webdriver.common.by import By
@@ -12,9 +13,21 @@ from selenium.webdriver.support.wait import WebDriverWait
 sys.path.append(os.path.dirname(__file__) + "/..")
 from common.types import SearchQuery, ScrapedItem
 from common.config import ScrapingConfig
+from scrapper.utils import second_tab
 
 
-def select_brand_and_model(driver, car_brand, car_model):
+def scrape(driver: uc.Chrome, cfg: ScrapingConfig, query: SearchQuery) -> typing.List[ScrapedItem]:
+    driver.get(cfg.start_url)
+    select_brand_and_model(driver, query.car_brand, query.car_model)
+    if not select_spare_part(driver, query.spare_part):
+        return []
+
+    images_dir = os.path.join(cfg.images_dir, query.car_brand, query.car_model, query.spare_part)
+    scraped_items = scrape_relevant_items_from_search_results(driver, query, images_dir)
+    print(scraped_items)
+
+
+def select_brand_and_model(driver: uc.Chrome, car_brand, car_model):
     logging.info(f'Selecting brand and model: {car_brand} - {car_model}')
 
     def select_from_dropdown_list(textbox_xpath, choice, timeout=10):
@@ -40,7 +53,7 @@ def select_brand_and_model(driver, car_brand, car_model):
     submit_button_el.click()
 
 
-def select_spare_part(driver, spare_part) -> bool:
+def select_spare_part(driver: uc.Chrome, spare_part) -> bool:
     '''
     Enters spare part name in search box, presses Enter and waits until the page is loaded
     Opens page with search results
@@ -101,29 +114,72 @@ def select_spare_part(driver, spare_part) -> bool:
     return True
 
 
-def scrape(driver, cfg: ScrapingConfig, query: SearchQuery) -> typing.List[ScrapedItem]:
-    driver.get(cfg.start_url)
-    select_brand_and_model(driver, query.car_brand, query.car_model)
-    return []
-
-    '''if not select_spare_part(driver, spare_part):
-        return []
-    search_result_el = driver.find_element(By.XPATH, '//div[@id="app"]//div[starts-with(@class, "items-items")]')
-    search_result = bs(search_result_el.get_attribute('innerHTML'), features="html.parser")
-    images_dir = os.path.join(cfg.output.images_dir, car_brand, car_model, spare_part)
+def scrape_relevant_items_from_search_results(driver: uc.Chrome, query: SearchQuery, images_dir: typing.Optional[str]):
+    items = driver.find_elements(By.XPATH, '//div[@id="app"]//div[starts-with(@class, "items-items")]//div['
+                                           '@data-marker="item"]')
     scraped_items = []
-    # i = 0
-    for item in search_result.contents:
-        #    i += 1
-        #    if i > 1:
-        #        break
-        props = scrape_item(driver, item, images_dir)
-        sale_ad = ScrapedItem(car_brand=car_brand, car_model=car_model, spare_part=spare_part,
-                              url=props['url'], name=props['name'], images=props['images'],
-                              description=props['description'],
-                              price_value=props['price']['value'],
-                              price_currency=props['price']['currency'],
-                              seller_name=props['seller']['name'],
-                              seller_label=props['seller']['label'])
-        scraped_items.append(sale_ad)
-    return scraped_items'''
+    for item in items:
+        item_link = item.find_element(By.XPATH, 'div[starts-with(@class, "iva-item-content")]/div[starts-with(@class, '
+                                                '"iva-item-body")]/div[starts-with(@class, "iva-item-titleStep")]/a')
+        title = item_link.get_attribute("title")
+        href = item_link.get_attribute("href")
+        logging.info(f'Found "{title}": {href}')
+        if title.lower().find(query.spare_part) == -1:
+            logging.info(f'Item "{title}" is not relevant for query {query}')
+            continue
+        props = scrape_item(driver, title, href, images_dir)
+        scraped_item = ScrapedItem(query=query, url=props['url'], title=props['title'], images=props['images'],
+                                   description=props['description'], price_value=props['price']['value'],
+                                   price_currency=props['price']['currency'], seller_name=props['seller']['name'],
+                                   seller_label=props['seller']['label'])
+        scraped_items.append(scraped_item)
+    return scraped_items
+
+
+def scrape_item(driver: uc.Chrome, title: str, link_to_item: str, images_dir: typing.Optional[str]):
+    with second_tab(driver, link_to_item):
+        props = parse_spare_part_page(driver)
+        props['url'] = driver.current_url
+        props['title'] = title
+        # local_image_urls = save_images_from_gallery(driver, images_dir)
+        # props['images'] = local_image_urls
+        props['images'] = []
+    return props
+
+
+def parse_spare_part_page(driver):
+    def get_price():
+        try:
+            value_el = driver.find_element(By.XPATH,
+                                           '//span[starts-with(@class, "style-price-value-main")]/span['
+                                           '@itemprop="price"]')
+            value = int(value_el.get_attribute('content'))
+            currency_el = driver.find_element(By.XPATH,
+                                              '//span[starts-with(@class, "style-price-value-main")]/span['
+                                              '@itemprop="priceCurrency"]')
+            currency = currency_el.get_attribute('content')
+            return {'value': value, 'currency': currency}
+        except NoSuchElementException:
+            return {'value': None}
+
+    def get_description():
+        try:
+            description_el = driver.find_element(By.XPATH,
+                                                 '//div[@id="app"]//div[@data-marker="item-view/item-description"]')
+            return description_el.text.strip()
+        except NoSuchElementException:
+            return None
+
+    def get_seller():
+        seller_el = driver.find_element(By.XPATH,
+                                        '//div[@id="app"]//div[starts-with(@class, "style-item-view-content-")]//div['
+                                        'starts-with(@class, "style-seller-info-col")]')
+        name = seller_el.find_element(By.XPATH, '//div[@data-marker="seller-info/name"]/a/span').text
+        label = seller_el.find_element(By.XPATH, '//div[@data-marker="seller-info/label"]').text
+        return {'name': name, 'label': label}
+
+    return {
+        'price': get_price(),
+        'description': get_description(),
+        'seller': get_seller()
+    }

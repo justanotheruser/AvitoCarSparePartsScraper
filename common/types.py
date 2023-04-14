@@ -11,11 +11,9 @@ class SearchQuery:
 
 @dataclass
 class ScrapedItem:
-    car_brand: str
-    car_model: str
-    spare_part: str
+    query: SearchQuery
     url: str
-    name: str
+    title: str
     images: List[str]
     description: str
     price_value: int

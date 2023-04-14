@@ -1,8 +1,8 @@
 import configparser
 import logging
+import os
 from dataclasses import dataclass
 from typing import Optional
-import os
 
 import dacite
 
@@ -17,12 +17,12 @@ class ScrapingConfig:
     start_url: str
     threads: int
     chrome_user_profiles_dir: str
+    images_dir: str
 
 
 @dataclass
 class OutputConfig:
     result_file: str
-    images_dir: str
 
 
 @dataclass
@@ -55,9 +55,9 @@ def read_config() -> Optional[Config]:
     scraping_cfg = dacite.from_dict(ScrapingConfig, {'start_url': config['scraping']['start_url'],
                                                      'threads': int(config['scraping']['threads']),
                                                      'chrome_user_profiles_dir': config['scraping'][
-                                                         'chrome_user_profiles_dir']})
-    output_cfg = dacite.from_dict(OutputConfig, {'result_file': config['output']['result_file'],
-                                                 'images_dir': config['output']['images_dir']})
+                                                         'chrome_user_profiles_dir'],
+                                                     'images_dir': config['scraping']['images_dir']})
+    output_cfg = dacite.from_dict(OutputConfig, {'result_file': config['output']['result_file']})
     misc_cfg = dacite.from_dict(Miscellaneous, {'scraped_file': config['miscellaneous']['scraped_file']})
 
     return Config(input_cfg, scraping_cfg, output_cfg, misc_cfg)
