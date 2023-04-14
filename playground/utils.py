@@ -23,7 +23,6 @@ def create_playground_driver():
     options.page_load_strategy = 'eager'
     return uc.Chrome(options=options, driver_executable_path='../scrapper/undetected_chromedriver.exe',
                      use_subprocess=False)
-    # return uc.Chrome(options=options, driver_executable_path='../scrapper/undetected_chromedriver.exe', use_subprocess=True)
 
 
 def setup_playground():

@@ -23,11 +23,7 @@ class ScrapingConfig:
 @dataclass
 class OutputConfig:
     result_file: str
-
-
-@dataclass
-class Miscellaneous:
-    scraped_file: str
+    failed_queries_file: str
 
 
 @dataclass
@@ -35,7 +31,6 @@ class Config:
     input: InputConfig
     scraping: ScrapingConfig
     output: OutputConfig
-    misc: Miscellaneous
 
 
 def read_config() -> Optional[Config]:
@@ -57,7 +52,7 @@ def read_config() -> Optional[Config]:
                                                      'chrome_user_profiles_dir': config['scraping'][
                                                          'chrome_user_profiles_dir'],
                                                      'images_dir': config['scraping']['images_dir']})
-    output_cfg = dacite.from_dict(OutputConfig, {'result_file': config['output']['result_file']})
-    misc_cfg = dacite.from_dict(Miscellaneous, {'scraped_file': config['miscellaneous']['scraped_file']})
+    output_cfg = dacite.from_dict(OutputConfig, {'result_file': config['output']['result_file'],
+                                                 'failed_queries_file': config['output']['failed_queries_file']})
 
-    return Config(input_cfg, scraping_cfg, output_cfg, misc_cfg)
+    return Config(input_cfg, scraping_cfg, output_cfg)

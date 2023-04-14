@@ -1,13 +1,14 @@
 import logging
 import os
 import shutil
+import subprocess
 import sys
 from threading import Thread
 
 sys.path.append(os.path.dirname(__file__) + "/..")
 from common.logger import setup_logger
 from common.config import read_config, ScrapingConfig
-from scrapper.scrapper_worker import scrapper_worker
+from scrapper.scrapper_thread_worker import scrapper_thread_worker
 
 
 def create_new_user_profile_dirs(cfg: ScrapingConfig):
@@ -24,25 +25,25 @@ def create_new_user_profile_dirs(cfg: ScrapingConfig):
 
 
 def main():
-    setup_logger('scrapper_manager.log')
+    logging.info('Started')
+    setup_logger('scrapper.log')
     cfg = read_config()
     if not cfg:
         return
-
-    try:
-        user_profile_dirs = create_new_user_profile_dirs(cfg.scraping)
-        scraping_threads = []
-        for i in range(cfg.scraping.threads):
-            scraping_thread = Thread(target=scrapper_worker, args=(cfg, user_profile_dirs[i]),
-                                     name=f'scraping_thread_{i}')
-            scraping_thread.start()
-            scraping_threads.append(scraping_thread)
-    except Exception as e:
-        logging.critical(e)
+    user_profile_dirs = create_new_user_profile_dirs(cfg.scraping)
+    scraping_threads = []
+    for i in range(cfg.scraping.threads):
+        scraping_thread = Thread(target=scrapper_thread_worker, args=(cfg, user_profile_dirs[i]),
+                                 name=f'scraping_thread_{i}')
+        scraping_thread.start()
+        scraping_threads.append(scraping_thread)
+    for scraping_thread in scraping_threads:
+        scraping_thread.join()
 
 
 if __name__ == '__main__':
     try:
+        subprocess.call("TASKKILL /f  /IM  CHROME.EXE")
         main()
     except KeyboardInterrupt:
         logging.info('Interrupted')

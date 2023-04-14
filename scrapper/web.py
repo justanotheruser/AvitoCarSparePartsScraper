@@ -27,8 +27,7 @@ def scrape(driver: uc.Chrome, cfg: ScrapingConfig, query: SearchQuery) -> typing
 
     logging.info(f'Search results page: {driver.current_url} for query {query}')
     images_dir = os.path.join(cfg.images_dir, query.car_brand, query.car_model, query.spare_part)
-    scraped_items = scrape_relevant_items_from_search_results(driver, query, images_dir)
-    print(scraped_items)
+    return scrape_relevant_items_from_search_results(driver, query, images_dir)
 
 
 def select_brand_and_model(driver: uc.Chrome, car_brand, car_model):
@@ -122,8 +121,12 @@ def scrape_relevant_items_from_search_results(driver: uc.Chrome, query: SearchQu
     search_result_el = driver.find_element(By.XPATH, '//div[@id="app"]//div[starts-with(@class, "items-items")]')
     search_result_dom = etree.HTML(search_result_el.get_attribute('innerHTML'))
     scraped_items = []
+    #i = 0
     for item_link in search_result_dom.xpath(
             '//div[starts-with(@class, "iva-item-content")]/div[starts-with(@class, "iva-item-body")]/div[starts-with(@class, "iva-item-titleStep")]/a'):
+        #i += 1
+        #if i > 3:
+        #    break
         title = item_link.get("title")
         href = 'https://www.avito.ru' + item_link.get("href")
         logging.info(f'Found "{title}": {href}')
@@ -135,7 +138,7 @@ def scrape_relevant_items_from_search_results(driver: uc.Chrome, query: SearchQu
                                    description=props['description'], price_value=props['price']['value'],
                                    price_currency=props['price']['currency'], seller_name=props['seller']['name'],
                                    seller_label=props['seller']['label'])
-        logging.info(scraped_item)
+        logging.debug(scraped_item)
         scraped_items.append(scraped_item)
     return scraped_items
 
