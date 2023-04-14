@@ -1,10 +1,12 @@
 import logging
 import os
+import re
 import sys
 import typing
 
+import requests
 import undetected_chromedriver as uc
-from selenium.common import NoSuchElementException, StaleElementReferenceException
+from selenium.common import NoSuchElementException, StaleElementReferenceException, TimeoutException
 from selenium.webdriver import Keys
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
@@ -13,7 +15,8 @@ from selenium.webdriver.support.wait import WebDriverWait
 sys.path.append(os.path.dirname(__file__) + "/..")
 from common.types import SearchQuery, ScrapedItem
 from common.config import ScrapingConfig
-from scrapper.utils import second_tab
+from scrapper.utils import counted_calls, second_tab
+from lxml import etree
 
 
 def scrape(driver: uc.Chrome, cfg: ScrapingConfig, query: SearchQuery) -> typing.List[ScrapedItem]:
@@ -22,6 +25,7 @@ def scrape(driver: uc.Chrome, cfg: ScrapingConfig, query: SearchQuery) -> typing
     if not select_spare_part(driver, query.spare_part):
         return []
 
+    logging.info(f'Search results page: {driver.current_url} for query {query}')
     images_dir = os.path.join(cfg.images_dir, query.car_brand, query.car_model, query.spare_part)
     scraped_items = scrape_relevant_items_from_search_results(driver, query, images_dir)
     print(scraped_items)
@@ -115,14 +119,13 @@ def select_spare_part(driver: uc.Chrome, spare_part) -> bool:
 
 
 def scrape_relevant_items_from_search_results(driver: uc.Chrome, query: SearchQuery, images_dir: typing.Optional[str]):
-    items = driver.find_elements(By.XPATH, '//div[@id="app"]//div[starts-with(@class, "items-items")]//div['
-                                           '@data-marker="item"]')
+    search_result_el = driver.find_element(By.XPATH, '//div[@id="app"]//div[starts-with(@class, "items-items")]')
+    search_result_dom = etree.HTML(search_result_el.get_attribute('innerHTML'))
     scraped_items = []
-    for item in items:
-        item_link = item.find_element(By.XPATH, 'div[starts-with(@class, "iva-item-content")]/div[starts-with(@class, '
-                                                '"iva-item-body")]/div[starts-with(@class, "iva-item-titleStep")]/a')
-        title = item_link.get_attribute("title")
-        href = item_link.get_attribute("href")
+    for item_link in search_result_dom.xpath(
+            '//div[starts-with(@class, "iva-item-content")]/div[starts-with(@class, "iva-item-body")]/div[starts-with(@class, "iva-item-titleStep")]/a'):
+        title = item_link.get("title")
+        href = 'https://www.avito.ru' + item_link.get("href")
         logging.info(f'Found "{title}": {href}')
         if title.lower().find(query.spare_part) == -1:
             logging.info(f'Item "{title}" is not relevant for query {query}')
@@ -132,6 +135,7 @@ def scrape_relevant_items_from_search_results(driver: uc.Chrome, query: SearchQu
                                    description=props['description'], price_value=props['price']['value'],
                                    price_currency=props['price']['currency'], seller_name=props['seller']['name'],
                                    seller_label=props['seller']['label'])
+        logging.info(scraped_item)
         scraped_items.append(scraped_item)
     return scraped_items
 
@@ -141,41 +145,71 @@ def scrape_item(driver: uc.Chrome, title: str, link_to_item: str, images_dir: ty
         props = parse_spare_part_page(driver)
         props['url'] = driver.current_url
         props['title'] = title
-        # local_image_urls = save_images_from_gallery(driver, images_dir)
-        # props['images'] = local_image_urls
-        props['images'] = []
+        if images_dir:
+            props['images'] = save_images_from_gallery(driver, images_dir)
+        else:
+            props['images'] = []
     return props
 
 
 def parse_spare_part_page(driver):
+    TIMEOUT = 10
+    content_xpath = '//div[@id="app"]//div[starts-with(@class, "style-item-view-content-")]'
+    WebDriverWait(driver, TIMEOUT, ignored_exceptions=(NoSuchElementException,)).until(
+        EC.presence_of_element_located((By.XPATH, content_xpath)))
+
     def get_price():
-        try:
-            value_el = driver.find_element(By.XPATH,
-                                           '//span[starts-with(@class, "style-price-value-main")]/span['
-                                           '@itemprop="price"]')
-            value = int(value_el.get_attribute('content'))
-            currency_el = driver.find_element(By.XPATH,
-                                              '//span[starts-with(@class, "style-price-value-main")]/span['
-                                              '@itemprop="priceCurrency"]')
-            currency = currency_el.get_attribute('content')
-            return {'value': value, 'currency': currency}
-        except NoSuchElementException:
-            return {'value': None}
+        price_info = {'value': None, 'currency': None}
+
+        def get_known_price():
+            try:
+                value_xpath = content_xpath + '//span[starts-with(@class, "style-price-value-main")]/span[' \
+                                              '@itemprop="price"]'
+                value_el = driver.find_element(By.XPATH, value_xpath)
+                value = int(value_el.get_attribute('content'))
+                currency_xpath = content_xpath + '//span[starts-with(@class, "style-price-value-main")]/span[' \
+                                                 '@itemprop="priceCurrency"]'
+                currency_el = driver.find_element(By.XPATH, currency_xpath)
+                currency = currency_el.get_attribute('content')
+                price_info['value'] = value
+                price_info['currency'] = currency
+                return True
+            except NoSuchElementException:
+                return False
+
+        def price_is_unknown():
+            price_value_xpath = content_xpath + '//span[starts-with(@class, "style-price-value-string")]/span'
+            price_value_el = driver.find_element(By.XPATH, price_value_xpath)
+            return price_value_el.get_attribute('innerHTML').find('указана') != -1
+
+        def got_price_info(driver):
+            return get_known_price() or price_is_unknown()
+
+        WebDriverWait(driver, TIMEOUT, ignored_exceptions=(NoSuchElementException,)).until(got_price_info)
+        return price_info
 
     def get_description():
         try:
-            description_el = driver.find_element(By.XPATH,
-                                                 '//div[@id="app"]//div[@data-marker="item-view/item-description"]')
+            description_xpath = content_xpath + '//div[@data-marker="item-view/item-description"]'
+            WebDriverWait(driver, TIMEOUT, ignored_exceptions=(NoSuchElementException,)).until(
+                EC.presence_of_element_located((By.XPATH, description_xpath)))
+            description_el = driver.find_element(By.XPATH, description_xpath)
             return description_el.text.strip()
         except NoSuchElementException:
             return None
 
     def get_seller():
-        seller_el = driver.find_element(By.XPATH,
-                                        '//div[@id="app"]//div[starts-with(@class, "style-item-view-content-")]//div['
-                                        'starts-with(@class, "style-seller-info-col")]')
-        name = seller_el.find_element(By.XPATH, '//div[@data-marker="seller-info/name"]/a/span').text
-        label = seller_el.find_element(By.XPATH, '//div[@data-marker="seller-info/label"]').text
+        seller_xpath = content_xpath + '//div[starts-with(@class, "style-seller-info-col")]'
+
+        seller_name_xpath = seller_xpath + '//div[@data-marker="seller-info/name"]'
+        WebDriverWait(driver, TIMEOUT, ignored_exceptions=(NoSuchElementException,)).until(
+            EC.presence_of_element_located((By.XPATH, seller_name_xpath)))
+        name = driver.find_element(By.XPATH, seller_name_xpath).text
+
+        seller_label_xpath = seller_xpath + '//div[@data-marker="seller-info/label"]'
+        WebDriverWait(driver, TIMEOUT, ignored_exceptions=(NoSuchElementException,)).until(
+            EC.presence_of_element_located((By.XPATH, seller_label_xpath)))
+        label = driver.find_element(By.XPATH, seller_label_xpath).text
         return {'name': name, 'label': label}
 
     return {
@@ -183,3 +217,40 @@ def parse_spare_part_page(driver):
         'description': get_description(),
         'seller': get_seller()
     }
+
+
+def save_images_from_gallery(driver, images_root_dir):
+    gallery_root_xpath = "//div[@id='app']//div[starts-with(@class, 'style-item-view-content')]//div[starts-with(" \
+                         "@class, 'gallery-root')]"
+    try:
+        WebDriverWait(driver, 10, ignored_exceptions=(NoSuchElementException,)).until(
+            EC.presence_of_element_located((By.XPATH, gallery_root_xpath)))
+        gallery_root_el = driver.find_element(By.XPATH, gallery_root_xpath)
+    except (TimeoutException, NoSuchElementException):
+        return []
+
+    local_urls = []
+    subdir = re.sub('[^a-zA-Z0-9._ -]', '', driver.current_url.split('/')[-1])
+    images_dir = os.path.join(images_root_dir, subdir)
+    os.makedirs(images_dir, exist_ok=True)
+
+    @counted_calls
+    def save_image(image_src):
+        response = requests.get(image_src)
+        image_filename = str(save_image.calls) + '.jpg'
+        image_filename = os.path.join(images_dir, image_filename)
+        with open(image_filename, 'wb') as f:
+            f.write(response.content)
+        local_urls.append(image_filename)
+
+    def save_current_image():
+        image_el = gallery_root_el.find_element(
+            By.XPATH, "//div[@id='app']//div[starts-with(@class, 'image-frame-wrapper-')]/img")
+        save_image(image_el.get_attribute('src'))
+
+    save_current_image()
+    for li_el in gallery_root_el.find_elements(By.TAG_NAME, 'li'):
+        li_el.click()
+        save_current_image()
+
+    return local_urls

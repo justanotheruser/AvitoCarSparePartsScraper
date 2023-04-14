@@ -13,6 +13,7 @@ ACURA_EL = 'https://www.avito.ru/all/zapchasti_i_aksessuary/zapchasti/dlya_avtom
 def test_valid_results_are_found():
     driver = setup_playground()
     try:
+        driver.get(ACURA_MDX_PAGE)
         search_results_found = select_spare_part(driver, 'фильтр')
         assert search_results_found
     except Exception as e:
@@ -49,4 +50,9 @@ def test_nothing_is_found():
 
 
 if __name__ == '__main__':
-    test_nothing_is_found()  # test_non_related_results_detected()  # test_valid_results_are_found()
+    test_nothing_is_found()
+    #test_non_related_results_detected()
+    #test_valid_results_are_found()
+
+
+

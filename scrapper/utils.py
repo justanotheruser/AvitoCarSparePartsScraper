@@ -15,3 +15,12 @@ def second_tab(driver, url):
     driver.close()
     driver.switch_to.window(original_window_handle)
     WebDriverWait(driver, 1).until(EC.number_of_windows_to_be(1))
+
+
+def counted_calls(f):
+    def wrapped(*args, **kwargs):
+        wrapped.calls += 1
+        return f(*args, **kwargs)
+
+    wrapped.calls = 0
+    return wrapped
