@@ -27,7 +27,7 @@ def scrape(driver: uc.Chrome, cfg: ScrapingConfig, query: SearchQuery) -> typing
 
     logging.info(f'Search results page: {driver.current_url} for query {query}')
     images_dir = os.path.join(cfg.images_dir, query.car_brand, query.car_model, query.spare_part)
-    return scrape_relevant_items_from_search_results(driver, query, images_dir)
+    return scrape_relevant_items_from_search_results(driver, query, images_dir, cfg.test_mode)
 
 
 def select_brand_and_model(driver: uc.Chrome, car_brand, car_model):
@@ -117,16 +117,17 @@ def select_spare_part(driver: uc.Chrome, spare_part) -> bool:
     return True
 
 
-def scrape_relevant_items_from_search_results(driver: uc.Chrome, query: SearchQuery, images_dir: typing.Optional[str]):
+def scrape_relevant_items_from_search_results(driver: uc.Chrome, query: SearchQuery, images_dir: typing.Optional[str], test_mode):
     search_result_el = driver.find_element(By.XPATH, '//div[@id="app"]//div[starts-with(@class, "items-items")]')
     search_result_dom = etree.HTML(search_result_el.get_attribute('innerHTML'))
     scraped_items = []
-    #i = 0
+    i = 0
     for item_link in search_result_dom.xpath(
             '//div[starts-with(@class, "iva-item-content")]/div[starts-with(@class, "iva-item-body")]/div[starts-with(@class, "iva-item-titleStep")]/a'):
-        #i += 1
-        #if i > 3:
-        #    break
+        if test_mode:
+            i += 1
+            if i > 2:
+                break
         title = item_link.get("title")
         href = 'https://www.avito.ru' + item_link.get("href")
         logging.info(f'Found "{title}": {href}')

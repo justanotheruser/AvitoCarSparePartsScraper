@@ -25,11 +25,12 @@ def create_new_user_profile_dirs(cfg: ScrapingConfig):
 
 
 def main():
-    logging.info('Started')
     setup_logger('scrapper.log')
     cfg = read_config()
     if not cfg:
         return
+
+    logging.info(f'Started with config {cfg}')
     user_profile_dirs = create_new_user_profile_dirs(cfg.scraping)
     scraping_threads = []
     for i in range(cfg.scraping.threads):

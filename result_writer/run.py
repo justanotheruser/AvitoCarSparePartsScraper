@@ -1,4 +1,3 @@
-import csv
 import json
 import logging
 import os
@@ -12,6 +11,7 @@ from common.logger import setup_logger
 from common.config import read_config
 from common.queues import SCRAPED_ITEMS_QUEUE
 from common.types import ScrapedItem
+import openpyxl
 
 
 def main():
@@ -23,9 +23,11 @@ def main():
     result_file = cfg.output.result_file
     logging.info(f'Result file: {result_file}')
     if not os.path.exists(result_file):
-        with open(result_file, 'w', newline='', encoding='utf-8') as f:
-            writer = csv.writer(f, delimiter='|')
-            writer.writerow(ScrapedItem.csv_header())
+        wb = openpyxl.Workbook()
+        sheet = wb.active
+        for i, column_header in enumerate(ScrapedItem.csv_header()):
+            sheet.cell(row=1, column=i+1).value = column_header
+        wb.save(result_file)
 
     connection = pika.BlockingConnection(pika.ConnectionParameters(host='localhost'))
     channel = connection.channel()
@@ -35,9 +37,14 @@ def main():
         item = json.loads(body)
         logging.info(f'Received item {item}')
         item = dacite.from_dict(data_class=ScrapedItem, data=item)
-        with open(result_file, 'a', newline='', encoding='utf-8') as f:
-            writer = csv.writer(f, delimiter='|')
-            writer.writerow(item.as_csv_columns())
+        wb = openpyxl.load_workbook(result_file)
+        sheet = wb.active
+        row_number = sheet.max_row + 1
+        for i, value in enumerate(item.as_csv_columns()):
+            if type(value) not in (int, float, str):
+                value = str(value)
+            sheet.cell(row=row_number, column=i+1).value = value
+        wb.save(result_file)
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
     channel.basic_consume(queue=SCRAPED_ITEMS_QUEUE, on_message_callback=read_item)

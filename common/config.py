@@ -18,6 +18,7 @@ class ScrapingConfig:
     threads: int
     chrome_user_profiles_dir: str
     images_dir: str
+    test_mode: bool
 
 
 @dataclass
@@ -51,7 +52,8 @@ def read_config() -> Optional[Config]:
                                                      'threads': int(config['scraping']['threads']),
                                                      'chrome_user_profiles_dir': config['scraping'][
                                                          'chrome_user_profiles_dir'],
-                                                     'images_dir': config['scraping']['images_dir']})
+                                                     'images_dir': config['scraping']['images_dir'],
+                                                     'test_mode': config['scraping'].getboolean('test_mode')})
     output_cfg = dacite.from_dict(OutputConfig, {'result_file': config['output']['result_file'],
                                                  'failed_queries_file': config['output']['failed_queries_file']})
 
