@@ -15,8 +15,13 @@ from common.queues import SEARCH_QUERIES_QUEUE
 
 def read_search_queries_from_file(filename: str):
     logging.info(f'Started reading {filename}')
-    wb = openpyxl.load_workbook(filename)
+    try:
+        wb = openpyxl.load_workbook(filename)
+    except Exception as e:
+        logging.error(e)
+        return
     sheet = wb.active
+    logging.debug(sheet)
     for i, row in enumerate(sheet.iter_rows(values_only=True)):
         if i == 0:
             continue
@@ -24,7 +29,7 @@ def read_search_queries_from_file(filename: str):
 
 
 def main():
-    setup_logger('input_reader.log')
+    setup_logger('input_reader.log', level=logging.DEBUG)
     cfg = read_config()
     if not cfg:
         return
@@ -34,6 +39,7 @@ def main():
     channel.queue_declare(queue=SEARCH_QUERIES_QUEUE)
 
     for i, query in enumerate(read_search_queries_from_file(cfg.input.file)):
+        logging.debug(query)
         if i % 10_000 == 0:
             res = channel.queue_declare(queue=SEARCH_QUERIES_QUEUE, passive=True)
             queue_size = res.method.message_count

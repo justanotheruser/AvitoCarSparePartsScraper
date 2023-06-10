@@ -4,6 +4,7 @@ import shutil
 import subprocess
 import sys
 from threading import Thread
+import threading
 
 sys.path.append(os.path.dirname(__file__) + "/..")
 from common.logger import setup_logger
@@ -22,6 +23,13 @@ def create_new_user_profile_dirs(cfg: ScrapingConfig):
         user_profile_dirs.append(user_profile_dir)
     logging.info(f'Created Chrome user profile dirs: {user_profile_dirs}')
     return user_profile_dirs
+
+
+
+def excepthook(args):
+    logging.error(f"Exception in thread: {args}")
+
+threading.excepthook = excepthook
 
 
 def main():
