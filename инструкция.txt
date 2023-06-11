@@ -1,0 +1,50 @@
+1. Открой PowerShell или командную строку Windows в режиме администратора , щелкнув правой кнопкой мыши и выбрав "Запуск от имени администратора", введите команду wsl --install. Начнётся установка Ubuntu. Надо будет дождаться завершения установки и задать логин и пароль для пользователя (не важно какие).
+
+2. Перезагрузка.
+
+3. Скачать Docker for Windows https://desktop.docker.com/win/main/amd64/Docker%20Desktop%20Installer.exe и установить его
+
+4. Запустить Docker Desktop
+
+5. Открыть командную строку и запустить RabbitMQ: docker run -it --rm --name rabbitmq -p 5672:5672 -p 15672:15672 rabbitmq:3.11-management
+
+6. Переходим в распакованную папку скрипта и выполняем
+	py -m venv .
+	.\Scripts\activate
+	pip install -r requirements.txt
+	python patcher.py
+
+8. Открываем файл конфига в папке скрипта common\config.ini и указываемабсолютные пути к:
+	- входному файлу ([input] file)
+	- файлу результата ([output] result_file)
+	- папке, где будут храниться картинки (images_dir)
+	- папке, где будут создаваться профили для Chrome (chrome_user_profiles_dir)
+	- выставляем количество тредов (threads)
+
+9. В той же консоли выполняем 
+	cd input_reader 
+	py run.py
+
+10. Открой новую консоль в папке скрипта и выполни
+	nssm install AvitoScrapperService
+	Откроется окно как на скриншоте. В нём надо:
+		- Указать путь к Python из папки Scripts, которая появилась после py -m venv .
+		- Указать путь к папке <путь к корню скрипта>\scrapper
+		- Указать в Arguments run.py
+
+11. Выполни nssm install AvitoScrapperResultWriterService
+	Откроется окно как на скриншоте. В нём надо:
+		- Указать путь к Python из папки Scripts
+		- Указать путь к папке <путь к корню скрипта>\result_writer
+		- Указать в Arguments run.py
+
+12. Выполни nssm install AvitoScrapperFailedQueriesHandlerService
+	Откроется окно как на скриншоте. В нём надо:
+		- Указать путь к Python из папки Scripts
+		- Указать путь к папке <путь к корню скрипта>\failed_queries_handler
+		- Указать в Arguments run.py
+
+13. Выполни:
+	nssm start AvitoScrapperService
+	nssm start AvitoScrapperResultWriterService
+	nssm start AvitoScrapperFailedQueriesHandlerService

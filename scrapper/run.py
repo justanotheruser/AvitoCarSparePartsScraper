@@ -27,7 +27,7 @@ def create_new_user_profile_dirs(cfg: ScrapingConfig):
 
 
 def excepthook(args):
-    logging.error(f"Exception in thread: {args}")
+    logging.exception("Exception in thread")
 
 threading.excepthook = excepthook
 

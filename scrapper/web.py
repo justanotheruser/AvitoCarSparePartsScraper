@@ -123,7 +123,7 @@ def scrape_relevant_items_from_search_results(driver: uc.Chrome, query: SearchQu
     scraped_items = []
     i = 0
     for item_link in search_result_dom.xpath(
-            '//div[starts-with(@class, "iva-item-content")]/div[starts-with(@class, "iva-item-body")]/div[starts-with(@class, "iva-item-titleStep")]/a'):
+            '//div[starts-with(@class, "iva-item-content")]/div[starts-with(@class, "iva-item-body")]/div[starts-with(@class, "iva-item-titleStep")]//a'):
         if test_mode:
             i += 1
             if i > 2:
