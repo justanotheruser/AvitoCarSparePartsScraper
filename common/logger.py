@@ -4,7 +4,7 @@ import sys
 
 def setup_logger(filename: str = None, level=logging.INFO):
     if filename:
-        handler = logging.FileHandler(filename, mode='a', encoding='utf-8')
+        handler = logging.FileHandler(filename, mode='w', encoding='utf-8')
     else:
         handler = logging.StreamHandler(stream=sys.stdout)
     handler.setLevel(level)

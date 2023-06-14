@@ -16,7 +16,7 @@ from web import scrape
 
 def scrapper_thread_worker(cfg: Config, chrome_user_profile_dir: str):
     logging.info('Started')
-    driver = create_driver(chrome_user_profile_dir)
+    driver = create_driver(chrome_user_profile_dir, cfg.scraping.headless)
     logging.info('Chrome driver created')
 
     connection = pika.BlockingConnection(pika.ConnectionParameters(host='localhost'))

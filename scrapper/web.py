@@ -186,8 +186,15 @@ def parse_spare_part_page(driver):
             price_value_el = driver.find_element(By.XPATH, price_value_xpath)
             return price_value_el.get_attribute('innerHTML').find('указана') != -1
 
+        def is_free():
+            price_value_xpath = content_xpath + '//span[starts-with(@class, "style-price-value-string")]/span'
+            price_value_el = driver.find_element(By.XPATH, price_value_xpath)
+            if price_value_el.get_attribute('innerHTML').find('Бесплатно') != -1:
+                price_info['value'] = 0
+                return True
+
         def got_price_info(driver):
-            return get_known_price() or price_is_unknown()
+            return get_known_price() or price_is_unknown() or is_free()
 
         WebDriverWait(driver, TIMEOUT, ignored_exceptions=(NoSuchElementException,)).until(got_price_info)
         return price_info
