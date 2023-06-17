@@ -10,6 +10,10 @@ class SearchQuery:
     car_model: str
     spare_part: str
 
+    @classmethod
+    def csv_header(cls):
+        return ['Марка', 'Модель', 'Запчасть']
+
 
 @dataclass_json
 @dataclass
@@ -24,7 +28,8 @@ class ScrapedItem:
     seller_name: str
     seller_label: str
 
-    def csv_header():
+    @classmethod
+    def csv_header(cls):
         return ['car_brand', 'car_model', 'spare_part',
                 'title', 'url', 'images', 'description', 'price_value',
                 'price_currency', 'seller_name', 'seller_label']

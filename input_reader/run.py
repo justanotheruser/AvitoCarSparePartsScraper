@@ -29,7 +29,7 @@ def read_search_queries_from_file(filename: str):
 
 
 def main():
-    setup_logger('input_reader.log', level=logging.DEBUG)
+    setup_logger('input_reader.log', level=logging.INFO)
     cfg = read_config()
     if not cfg:
         return
