@@ -21,8 +21,12 @@ from lxml import etree
 
 def scrape(driver: uc.Chrome, cfg: ScrapingConfig, query: SearchQuery) -> typing.List[ScrapedItem]:
     driver.get(cfg.start_url)
-    select_brand_and_model(driver, query.car_brand, query.car_model)
-    if not select_spare_part(driver, query.spare_part):
+    text_search = query.spare_part
+    try:
+        select_brand_and_model(driver, query.car_brand, query.car_model)
+    except TimeoutException:
+        text_search = f'{query.car_brand} {query.car_model} {query.spare_part}'
+    if not select_spare_part(driver, text_search, query.spare_part):
         return []
 
     logging.info(f'Search results page: {driver.current_url} for query {query}')
@@ -56,7 +60,7 @@ def select_brand_and_model(driver: uc.Chrome, car_brand, car_model):
     submit_button_el.click()
 
 
-def select_spare_part(driver: uc.Chrome, spare_part) -> bool:
+def select_spare_part(driver: uc.Chrome, spare_part, await_for_title) -> bool:
     '''
     Enters spare part name in search box, presses Enter and waits until the page is loaded
     Opens page with search results
@@ -70,7 +74,7 @@ def select_spare_part(driver: uc.Chrome, spare_part) -> bool:
     textbox_el = driver.find_element(By.CLASS_NAME, 'input-input-Zpzc1')
     textbox_el.send_keys(spare_part)
     textbox_el.send_keys(Keys.ENTER)
-    WebDriverWait(driver, 10, poll_frequency=0.1).until(EC.title_contains(spare_part))
+    WebDriverWait(driver, 10, poll_frequency=0.1).until(EC.title_contains(await_for_title))
 
     def is_search_results_found(dr):
         try:
@@ -131,7 +135,7 @@ def scrape_relevant_items_from_search_results(driver: uc.Chrome, query: SearchQu
         title = item_link.get("title")
         href = 'https://www.avito.ru' + item_link.get("href")
         logging.info(f'Found "{title}": {href}')
-        if title.lower().find(query.spare_part) == -1:
+        if title.lower().find(query.spare_part) == -1 or title.lower().find('ремонт') != -1:
             logging.info(f'Item "{title}" is not relevant for query {query}')
             continue
         props = scrape_item(driver, title, href, images_dir)
