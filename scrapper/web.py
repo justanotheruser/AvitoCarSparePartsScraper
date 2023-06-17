@@ -2,6 +2,7 @@ import logging
 import os
 import re
 import sys
+import time
 import typing
 
 import requests
@@ -31,7 +32,19 @@ def scrape(driver: uc.Chrome, cfg: ScrapingConfig, query: SearchQuery) -> typing
 
     logging.info(f'Search results page: {driver.current_url} for query {query}')
     images_dir = os.path.join(cfg.images_dir, query.car_brand, query.car_model, query.spare_part)
-    return scrape_relevant_items_from_search_results(driver, query, images_dir, cfg.test_mode)
+    items = scrape_relevant_items_from_search_results(driver, query, images_dir, cfg.test_mode)
+    try:
+        pagination_list_xpath = '//div[@id="app"]//nav[@aria-label="Пагинация"]/ul/li'
+        pages_btns = driver.find_elements(By.XPATH, pagination_list_xpath)
+        for page_btn in pages_btns[1:]:
+            page_btn.click()
+            time.sleep(1)
+            page_items = scrape_relevant_items_from_search_results(driver, query, images_dir, cfg.test_mode)
+            items.extend(page_items)
+    except Exception as e:
+        logging.error(e)
+    finally:
+        return items
 
 
 def select_brand_and_model(driver: uc.Chrome, car_brand, car_model):
